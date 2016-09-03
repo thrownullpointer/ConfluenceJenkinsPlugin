@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
     private final String name;
-    private final Integer pageId;
+    private final String pageId;
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     /*@DataBoundConstructor
@@ -47,7 +47,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     }*/
     
     @DataBoundConstructor
-    public HelloWorldBuilder(String name, Integer pageId) {
+    public HelloWorldBuilder(String name, String pageId) {
         this.name = name;
         this.pageId = pageId;
     }
@@ -58,7 +58,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     public String getName() {
         return name;
     }
-    public Integer getPageId() {
+    public String getPageId() {
         return pageId;
     }
 
@@ -132,7 +132,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
             return FormValidation.ok();
         }
         
-        public FormValidation doCheck(@QueryParameter String value)
+        public FormValidation doCheckPageId(@QueryParameter String value)
                 throws IOException, ServletException {
             if (value.length() == 0)
                 return FormValidation.error("Page id should not be left null");
