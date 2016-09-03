@@ -16,6 +16,7 @@ import org.kohsuke.stapler.QueryParameter;
 
 import javax.servlet.ServletException;
 import java.io.IOException;
+import java.util.regex.Pattern;
 
 /**
  * Sample {@link Builder}.
@@ -130,7 +131,15 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
                 return FormValidation.warning("Isn't the name too short?");
             return FormValidation.ok();
         }
-
+        
+        public FormValidation doCheck(@QueryParameter String value)
+                throws IOException, ServletException {
+            if (value.length() == 0)
+                return FormValidation.error("Page id should not be left null");
+            else if (!Pattern.matches("[0-9]+", value))
+                return FormValidation.error("Page id should be a numeric value");
+            return FormValidation.ok();
+        }
         public boolean isApplicable(Class<? extends AbstractProject> aClass) {
             // Indicates that this builder can be used with all kinds of project types 
             return true;
