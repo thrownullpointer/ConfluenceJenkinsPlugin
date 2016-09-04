@@ -1,25 +1,33 @@
 package org.jenkinsci.plugins.Confluence;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 
 import org.apache.commons.io.FileUtils;
-import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.client.authentication.HttpAuthenticationFeature;
-
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContexts;
+import org.apache.http.util.EntityUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -60,6 +68,8 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	private final String name;
 	private final String pageId;
 	private final String filePath;
+    private static final String ENCODING = "utf-8";
+    //private static final String BASE_URL = "http://localhost:8090";
 
 	// Fields in config.jelly must match the parameter names in the
 	// "DataBoundConstructor"
@@ -98,10 +108,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 		// This also shows how you can consult the global configuration of the
 		// builder
-		if (getDescriptor().getUseFrench())
-			listener.getLogger().println("Bonjour, " + name + "!");
-		else
-			listener.getLogger().println("Hello, " + name + "!");
+
 
 		// We can get creds!
 		listener.getLogger().println("Shouldn't we update this page? " + pageId);
@@ -110,7 +117,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 				.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
 
-		ClientConfig clientConfig = new ClientConfig();
+		/*ClientConfig clientConfig = new ClientConfig();
 		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),
 				c.getPassword().getPlainText());
 		clientConfig.register(feature);
@@ -131,11 +138,87 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		Response response = invocationBuilder.post(Entity.entity(contents, MediaType.APPLICATION_JSON));
 		listener.getLogger().println(response.getStatus());
 		listener.getLogger().println(response.getStatusInfo());
+		
+		
 		}
 		catch (Exception e){
 			
-		}
-	}
+		}*/
+		
+
+		//SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
+		// Allow TLSv1 protocol only
+		//SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" }, null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+
+		HttpHost target = new HttpHost("localhost", 8090, "http");
+		org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
+		credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()), new org.apache.http.auth.UsernamePasswordCredentials(c.getUsername(), c.getPassword().getPlainText()));
+
+		//CloseableHttpClient httpclient = HttpClients.custom().setSSLSocketFactory(sslsf).setDefaultCredentialsProvider(credsProvider).build();
+		CloseableHttpClient httpclient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
+
+		// Get current page version
+		String pageObj = null;
+		HttpEntity pageEntity = null;
+		try {
+			String body = FileUtils.readFileToString(new File(filePath));
+			String uri = "http://localhost:8090" + "/rest/api/content/" + pageId;
+		    HttpGet getPageRequest = new HttpGet(uri);
+		    HttpResponse getPageResponse = httpclient.execute(getPageRequest);
+		    pageEntity = getPageResponse.getEntity();
+
+		    pageObj = IOUtils.toString(pageEntity.getContent());
+
+		    listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine().toString());
+		    listener.getLogger().println("");
+		    listener.getLogger().println(pageObj);
+		    if (pageEntity != null) {
+			EntityUtils.consume(pageEntity);
+		    }    
+		
+
+		// Parse response into JSON
+
+		 org.json.JSONObject page = new  org.json.JSONObject(pageObj);
+
+		// Update page
+		// The updated value must be Confluence Storage Format
+		// (https://confluence.atlassian.com/display/DOC/Confluence+Storage+Format),
+		// NOT HTML.
+
+		page.getJSONObject("body").getJSONObject("storage").put("value", body);
+
+		int currentVersion = page.getJSONObject("version").getInt("number");
+		page.getJSONObject("version").put("number", currentVersion + 1);
+
+		// Send update request
+		HttpEntity putPageEntity = null;
+
+		    HttpPut putPageRequest = new HttpPut(uri);
+
+		    StringEntity entity = new StringEntity(page.toString(), ContentType.APPLICATION_JSON);
+		    putPageRequest.setEntity(entity);
+
+		    HttpResponse putPageResponse = httpclient.execute(putPageRequest);
+		    putPageEntity = putPageResponse.getEntity();
+
+		   listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
+		   listener.getLogger().println("");
+		   listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
+		
+
+		    EntityUtils.consume(putPageEntity);
+		    }
+		    catch (Exception e){
+		    	listener.getLogger().print(e);
+		    }
+		
+	    }
+	
+   /* private static String getContentRestUrl(final Long contentId, final String[] expansions) throws UnsupportedEncodingException {
+	final String expand = URLEncoder.encode(StringUtils.join(expansions, ","), ENCODING);
+	return String.format("%s/rest/api/content/%s", BASE_URL, contentId);
+    }
 
 	// Overridden for better type safety.
 	// If your plugin doesn't really define any property on Descriptor,
