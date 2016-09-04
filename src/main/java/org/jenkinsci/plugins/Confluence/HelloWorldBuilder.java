@@ -95,22 +95,23 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 		// We can get creds!
 		listener.getLogger().println("Shouldn't we update this page? " + pageId);
-		
+
 		List<UsernamePasswordCredentials> creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
-		
-	    /*ClientConfig clientConfig = new ClientConfig();
-	    HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(), c.getPassword().getPlainText());
-	    clientConfig.register( feature) ;
-	 
-	    Client client = ClientBuilder.newClient( clientConfig );
-	    WebTarget webTarget = client.target("http://localhost:8090/rest/api/").path("content");
-	     
-	    Invocation.Builder invocationBuilder =  webTarget.request(MediaType.APPLICATION_JSON);
-	    String body = "{\"type\":\"page\",\"title\":\"new page\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":\"<p>This is a new page</p>\",\"representation\":\"storage\"}}}";
-	    Response response = invocationBuilder.post(Entity.entity(body, MediaType.APPLICATION_JSON));
-	    listener.getLogger().println(response.getStatus());
-	    listener.getLogger().println(response.getStatusInfo());*/
+
+		/*ClientConfig clientConfig = new ClientConfig();
+		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),c.getPassword().getPlainText());
+		clientConfig.register(feature);
+
+		Client client = ClientBuilder.newClient(clientConfig);
+		WebTarget webTarget = client.target("http://localhost:8090/rest/api/").path("content");
+
+		Invocation.Builder invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON);
+		String body = "{\"type\":\"page\",\"title\":\"new page\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":\"<p>This is a new page</p>\",\"representation\":\"storage\"}}}";
+		Response response = invocationBuilder.post(Entity.entity(body, MediaType.APPLICATION_JSON));
+		listener.getLogger().println(response.getStatus());
+		listener.getLogger().println(response.getStatusInfo());
+        */
 	}
 
 	// Overridden for better type safety.

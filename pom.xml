@@ -64,6 +64,23 @@
 			<artifactId>credentials</artifactId>
 			<version>1.9.4</version>
 		</dependency>
+		<!--
+		<dependency>
+			<groupId>org.glassfish.jersey.core</groupId>
+			<artifactId>jersey-client</artifactId>
+			<version>2.23.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish.jersey.media</groupId>
+			<artifactId>jersey-media-json-jackson</artifactId>
+			<version>2.23.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20090211</version>
+		</dependency>
+		-->
 	</dependencies>
 
 	<description>Exposes the Confluence Rest API calls through a Jenkins Plugin</description>
