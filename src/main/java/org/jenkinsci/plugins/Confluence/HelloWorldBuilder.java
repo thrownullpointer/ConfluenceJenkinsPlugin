@@ -1,22 +1,28 @@
 package org.jenkinsci.plugins.Confluence;
-import hudson.Launcher;
+import java.io.IOException;
+import java.util.List;
+import java.util.regex.Pattern;
+
+import javax.servlet.ServletException;
+
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
+
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
+
 import hudson.Extension;
 import hudson.FilePath;
-import hudson.util.FormValidation;
+import hudson.Launcher;
 import hudson.model.AbstractProject;
 import hudson.model.Run;
 import hudson.model.TaskListener;
-import hudson.tasks.Builder;
 import hudson.tasks.BuildStepDescriptor;
+import hudson.tasks.Builder;
+import hudson.util.FormValidation;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.QueryParameter;
-
-import javax.servlet.ServletException;
-import java.io.IOException;
-import java.util.regex.Pattern;
 
 /**
  * Sample {@link Builder}.
@@ -38,7 +44,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
     private final String name;
     private final String pageId;
-
+    
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     /*@DataBoundConstructor
     public HelloWorldBuilder(String name) {
@@ -73,7 +79,13 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
         else
             listener.getLogger().println("Hello, "+name+"!");
         
+        //We can get creds!
         listener.getLogger().println("Shouldn't we update this page? " + pageId);
+        List<UsernamePasswordCredentials > creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials .class, jenkins.model.Jenkins.getInstance());
+        for (UsernamePasswordCredentials  c : creds){
+        	listener.getLogger().println(c.getPassword());
+        	listener.getLogger().println(c.getUsername());      	
+        }
     }
 
     // Overridden for better type safety.
@@ -172,6 +184,8 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
         public boolean getUseFrench() {
             return useFrench;
         }
+        
+        
     }
 }
 
