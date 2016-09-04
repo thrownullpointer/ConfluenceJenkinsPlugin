@@ -1,5 +1,8 @@
 package org.jenkinsci.plugins.Confluence;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -13,6 +16,7 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.io.FileUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.authentication.HttpAuthenticationFeature;
 
@@ -55,6 +59,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 	private final String name;
 	private final String pageId;
+	private final String filePath;
 
 	// Fields in config.jelly must match the parameter names in the
 	// "DataBoundConstructor"
@@ -64,9 +69,10 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	 */
 
 	@DataBoundConstructor
-	public HelloWorldBuilder(String name, String pageId) {
+	public HelloWorldBuilder(String name, String pageId, String filePath) {
 		this.name = name;
 		this.pageId = pageId;
+		this.filePath = filePath;
 	}
 
 	/**
@@ -78,6 +84,10 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 	public String getPageId() {
 		return pageId;
+	}
+	
+	public String getFilePath() {
+		return filePath;
 	}
 
 	@Override
@@ -96,21 +106,35 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		// We can get creds!
 		listener.getLogger().println("Shouldn't we update this page? " + pageId);
 
-		List<UsernamePasswordCredentials> creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
+		List<UsernamePasswordCredentials> creds = CredentialsProvider
+				.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
 
 		ClientConfig clientConfig = new ClientConfig();
-		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),c.getPassword().getPlainText());
+		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),
+				c.getPassword().getPlainText());
 		clientConfig.register(feature);
-
 		Client client = ClientBuilder.newClient(clientConfig);
-		WebTarget webTarget = client.target("http://localhost:8090/rest/api/").path("content");
+		WebTarget webTarget = client.target("http://localhost:8090/rest/api/content/" + pageId);
 
 		Invocation.Builder invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON);
-		String body = "{\"type\":\"page\",\"title\":\"new page\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":\"<p>This is a new page</p>\",\"representation\":\"storage\"}}}";
-		Response response = invocationBuilder.post(Entity.entity(body, MediaType.APPLICATION_JSON));
+		Response resp = invocationBuilder.get();
+		Object r = resp.getEntity();
+		listener.getLogger().println("CHECKME2");
+		
+		try{
+		webTarget = client.target("http://localhost:8090/rest/api/").path("content");
+		invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON);
+		String body = FileUtils.readFileToString(new File(filePath));
+		listener.getLogger().println(body);
+		String contents = "{\"type\":\"page\",\"title\":\"new page\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":" + body + ",\"representation\":\"storage\"}}}";
+		Response response = invocationBuilder.post(Entity.entity(contents, MediaType.APPLICATION_JSON));
 		listener.getLogger().println(response.getStatus());
 		listener.getLogger().println(response.getStatusInfo());
+		}
+		catch (Exception e){
+			
+		}
 	}
 
 	// Overridden for better type safety.

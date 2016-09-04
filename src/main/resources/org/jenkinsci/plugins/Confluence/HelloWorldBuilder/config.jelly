@@ -16,4 +16,7 @@
     <f:entry title="PageId" field="pageId">
     <f:textbox />
   </f:entry>
+      <f:entry title="FilePath" field="filePath">
+    <f:textbox />
+  </f:entry>
 </j:jelly>
