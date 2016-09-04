@@ -7,7 +7,6 @@ import java.net.URLEncoder;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import javax.net.ssl.SSLContext;
 import javax.servlet.ServletException;
 
 import org.apache.commons.io.FileUtils;
@@ -19,14 +18,11 @@ import org.apache.http.HttpResponse;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPut;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContexts;
 import org.apache.http.util.EntityUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -68,8 +64,8 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	private final String name;
 	private final String pageId;
 	private final String filePath;
-    private static final String ENCODING = "utf-8";
-    //private static final String BASE_URL = "http://localhost:8090";
+	private static final String ENCODING = "utf-8";
+	// private static final String BASE_URL = "http://localhost:8090";
 
 	// Fields in config.jelly must match the parameter names in the
 	// "DataBoundConstructor"
@@ -95,21 +91,20 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	public String getPageId() {
 		return pageId;
 	}
-	
+
 	public String getFilePath() {
 		return filePath;
 	}
+	
+	private static String getContentRestUrl(final Long contentId, final String[] expansions, String u,  String p,  String base) throws UnsupportedEncodingException {
+		final String ENCODING = "utf-8";
+		final String expand = URLEncoder.encode(StringUtils.join(expansions, ","), ENCODING);
+
+		return String.format("%s/rest/api/content/%s?expand=%s&os_authType=basic&os_username=%s&os_password=%s", base, contentId, expand, URLEncoder.encode(u, ENCODING), URLEncoder.encode(p, ENCODING));
+	    }
 
 	@Override
 	public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
-		// This is where you 'build' the project.
-		// Since this is a dummy, we just say 'hello world' and call that a
-		// build.
-
-		// This also shows how you can consult the global configuration of the
-		// builder
-
-
 		// We can get creds!
 		listener.getLogger().println("Shouldn't we update this page? " + pageId);
 
@@ -117,44 +112,17 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 				.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
 
-		/*ClientConfig clientConfig = new ClientConfig();
-		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),
-				c.getPassword().getPlainText());
-		clientConfig.register(feature);
-		Client client = ClientBuilder.newClient(clientConfig);
-		WebTarget webTarget = client.target("http://localhost:8090/rest/api/content/" + pageId);
-
-		Invocation.Builder invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON);
-		Response resp = invocationBuilder.get();
-		Object r = resp.getEntity();
-		listener.getLogger().println("CHECKME2");
-		
-		try{
-		webTarget = client.target("http://localhost:8090/rest/api/").path("content");
-		invocationBuilder = webTarget.request(MediaType.APPLICATION_JSON);
-		String body = FileUtils.readFileToString(new File(filePath));
-		listener.getLogger().println(body);
-		String contents = "{\"type\":\"page\",\"title\":\"new page\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":" + body + ",\"representation\":\"storage\"}}}";
-		Response response = invocationBuilder.post(Entity.entity(contents, MediaType.APPLICATION_JSON));
-		listener.getLogger().println(response.getStatus());
-		listener.getLogger().println(response.getStatusInfo());
-		
-		
-		}
-		catch (Exception e){
-			
-		}*/
-		
-
-		//SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
+		// SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
 		// Allow TLSv1 protocol only
-		//SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" }, null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+		// SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" },null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
 
 		HttpHost target = new HttpHost("localhost", 8090, "http");
 		org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
-		credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()), new org.apache.http.auth.UsernamePasswordCredentials(c.getUsername(), c.getPassword().getPlainText()));
+		credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()),
+				new org.apache.http.auth.UsernamePasswordCredentials(c.getUsername(), c.getPassword().getPlainText()));
 
-		//CloseableHttpClient httpclient = HttpClients.custom().setSSLSocketFactory(sslsf).setDefaultCredentialsProvider(credsProvider).build();
+		// CloseableHttpClient httpclient =
+		// HttpClients.custom().setSSLSocketFactory(sslsf).setDefaultCredentialsProvider(credsProvider).build();
 		CloseableHttpClient httpclient = HttpClients.custom().setDefaultCredentialsProvider(credsProvider).build();
 
 		// Get current page version
@@ -162,80 +130,68 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		HttpEntity pageEntity = null;
 		try {
 			String body = FileUtils.readFileToString(new File(filePath));
-			String uri = "http://localhost:8090" + "/rest/api/content/" + pageId;
-		    HttpGet getPageRequest = new HttpGet(uri);
-		    HttpResponse getPageResponse = httpclient.execute(getPageRequest);
-		    pageEntity = getPageResponse.getEntity();
+			String uri2 = "http://localhost:8090" + "/rest/api/content/" + pageId;
+			listener.getLogger().println(uri2);
+			String uri = getContentRestUrl(Long.valueOf(pageId), new String[] { "body.storage", "version", "ancestors" }, c.getUsername(), c.getPassword().getPlainText(), "http://localhost:8090");
+			listener.getLogger().println(uri);
+			listener.getLogger().println("HELLO WORLD!");
+			HttpGet getPageRequest = new HttpGet(uri);
+			HttpResponse getPageResponse = httpclient.execute(getPageRequest);
+			pageEntity = getPageResponse.getEntity();
 
-		    pageObj = IOUtils.toString(pageEntity.getContent());
+			pageObj = IOUtils.toString(pageEntity.getContent());
 
-		    listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine().toString());
-		    listener.getLogger().println("");
-		    listener.getLogger().println(pageObj);
-		    if (pageEntity != null) {
-			EntityUtils.consume(pageEntity);
-		    }    
-		
+			listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine().toString());
+			listener.getLogger().println(pageObj);
+			if (pageEntity != null) {
+				EntityUtils.consume(pageEntity);
+			}
 
-		// Parse response into JSON
+			org.json.JSONObject page = new org.json.JSONObject(pageObj);
+			page.getJSONObject("body").getJSONObject("storage").put("value", body);
+			int currentVersion = page.getJSONObject("version").getInt("number");
+			page.getJSONObject("version").put("number", currentVersion + 1);
 
-		 org.json.JSONObject page = new  org.json.JSONObject(pageObj);
+			// Send update request
+			HttpEntity putPageEntity = null;
 
-		// Update page
-		// The updated value must be Confluence Storage Format
-		// (https://confluence.atlassian.com/display/DOC/Confluence+Storage+Format),
-		// NOT HTML.
+			HttpPut putPageRequest = new HttpPut(uri);
 
-		page.getJSONObject("body").getJSONObject("storage").put("value", body);
+			StringEntity entity = new StringEntity(page.toString(), ContentType.APPLICATION_JSON);
+			putPageRequest.setEntity(entity);
 
-		int currentVersion = page.getJSONObject("version").getInt("number");
-		page.getJSONObject("version").put("number", currentVersion + 1);
+			HttpResponse putPageResponse = httpclient.execute(putPageRequest);
+			putPageEntity = putPageResponse.getEntity();
 
-		// Send update request
-		HttpEntity putPageEntity = null;
+			listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
+			listener.getLogger().println("");
+			listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
 
-		    HttpPut putPageRequest = new HttpPut(uri);
+			EntityUtils.consume(putPageEntity);
+		} catch (Exception e) {
+			listener.getLogger().print(e);
+		}
 
-		    StringEntity entity = new StringEntity(page.toString(), ContentType.APPLICATION_JSON);
-		    putPageRequest.setEntity(entity);
-
-		    HttpResponse putPageResponse = httpclient.execute(putPageRequest);
-		    putPageEntity = putPageResponse.getEntity();
-
-		   listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
-		   listener.getLogger().println("");
-		   listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
-		
-
-		    EntityUtils.consume(putPageEntity);
-		    }
-		    catch (Exception e){
-		    	listener.getLogger().print(e);
-		    }
-		
-	    }
-	
-   /* private static String getContentRestUrl(final Long contentId, final String[] expansions) throws UnsupportedEncodingException {
-	final String expand = URLEncoder.encode(StringUtils.join(expansions, ","), ENCODING);
-	return String.format("%s/rest/api/content/%s", BASE_URL, contentId);
-    }
-
-	// Overridden for better type safety.
-	// If your plugin doesn't really define any property on Descriptor,
-	// you don't have to do this.
-	@Override
-	public DescriptorImpl getDescriptor() {
-		return (DescriptorImpl) super.getDescriptor();
 	}
 
-	/**
-	 * Descriptor for {@link HelloWorldBuilder}. Used as a singleton. The class
-	 * is marked as public so that it can be accessed from views.
+	/*
+	 * private static String getContentRestUrl(final Long contentId, final
+	 * String[] expansions) throws UnsupportedEncodingException { final String
+	 * expand = URLEncoder.encode(StringUtils.join(expansions, ","), ENCODING);
+	 * return String.format("%s/rest/api/content/%s", BASE_URL, contentId); }
+	 * 
+	 * // Overridden for better type safety. // If your plugin doesn't really
+	 * define any property on Descriptor, // you don't have to do this.
+	 * 
+	 * @Override public DescriptorImpl getDescriptor() { return (DescriptorImpl)
+	 * super.getDescriptor(); }
+	 * 
+	 * /** Descriptor for {@link HelloWorldBuilder}. Used as a singleton. The
+	 * class is marked as public so that it can be accessed from views.
 	 *
-	 * <p>
-	 * See
-	 * <tt>src/main/resources/hudson/plugins/hello_world/HelloWorldBuilder/*.jelly</tt>
-	 * for the actual HTML fragment for the configuration screen.
+	 * <p> See
+	 * <tt>src/main/resources/hudson/plugins/hello_world/HelloWorldBuilder/*.
+	 * jelly</tt> for the actual HTML fragment for the configuration screen.
 	 */
 	@Extension // This indicates to Jenkins that this is an implementation of an
 				// extension point.
