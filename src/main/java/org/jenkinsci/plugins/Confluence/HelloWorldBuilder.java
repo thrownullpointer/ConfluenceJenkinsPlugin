@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
-/*import javax.ws.rs.client.Client;
+import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.Invocation;
@@ -15,7 +15,7 @@ import javax.ws.rs.core.Response;
 
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.authentication.HttpAuthenticationFeature;
-*/
+
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -99,7 +99,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		List<UsernamePasswordCredentials> creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
 
-		/*ClientConfig clientConfig = new ClientConfig();
+		ClientConfig clientConfig = new ClientConfig();
 		HttpAuthenticationFeature feature = HttpAuthenticationFeature.basic(c.getUsername(),c.getPassword().getPlainText());
 		clientConfig.register(feature);
 
@@ -111,7 +111,6 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		Response response = invocationBuilder.post(Entity.entity(body, MediaType.APPLICATION_JSON));
 		listener.getLogger().println(response.getStatus());
 		listener.getLogger().println(response.getStatusInfo());
-        */
 	}
 
 	// Overridden for better type safety.
