@@ -65,6 +65,11 @@
 			<artifactId>credentials</artifactId>
 			<version>1.9.4</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.cxf</groupId>
+			<artifactId>cxf-rt-rs-client</artifactId>
+			<version>3.0.0-milestone1</version>
+		</dependency>
 	</dependencies>
 
 	<description>Exposes the Confluence Rest API calls through a Jenkins Plugin</description>
