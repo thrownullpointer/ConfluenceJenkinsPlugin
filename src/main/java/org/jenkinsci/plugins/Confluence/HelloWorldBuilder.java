@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 
+import org.apache.cxf.jaxrs.client.JAXRSClientFactory;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -21,6 +22,7 @@ import hudson.model.TaskListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
+import jenkins.model.*;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
 
@@ -81,11 +83,10 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
         
         //We can get creds!
         listener.getLogger().println("Shouldn't we update this page? " + pageId);
-        List<UsernamePasswordCredentials > creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials .class, jenkins.model.Jenkins.getInstance());
-        for (UsernamePasswordCredentials  c : creds){
-        	listener.getLogger().println(c.getPassword());
-        	listener.getLogger().println(c.getUsername());      	
-        }
+        List<UsernamePasswordCredentials > creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials .class, Jenkins.getInstance());
+        UsernamePasswordCredentials c = creds.get(0);
+        ConfluenceRestClient cli = JAXRSClientFactory.create("http://localhost:8090", ConfluenceRestClient.class, c.getUsername(), c.getPassword());
+        cli.createPage("{\"type\":\"page\",\"title\":\"new page2\",\"space\":{\"key\":\"THEB\"},\"body\":{\"storage\":{\"value\":\"<p>This is a new page</p>\",\"representation\":\"storage\"}}}");
     }
 
     // Overridden for better type safety.
