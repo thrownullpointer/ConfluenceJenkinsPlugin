@@ -32,13 +32,17 @@ import org.kohsuke.stapler.StaplerRequest;
 
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
+import com.cloudbees.plugins.credentials.domains.DomainRequirement;
+import com.cloudbees.plugins.credentials.domains.HostnamePortRequirement;
 
+import hudson.AbortException;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.AbstractProject;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import hudson.security.ACL;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
@@ -91,15 +95,13 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	}
 	
 	@Override
-	public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
-		List<UsernamePasswordCredentials> creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
-		UsernamePasswordCredentials c = creds.get(0);
+	public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException{
 		
 		// SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
 		// Allow TLSv1 protocol only
 		// SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" },null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
-		try {
-			listener.getLogger().println(hostName);
+		//try {
+		listener.getLogger().println(hostName);
 		URL url = new URL (hostName);
 
 		Integer port = url.getPort();
@@ -110,11 +112,16 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		listener.getLogger().println(url.getHost());
 		listener.getLogger().println(port);
 		listener.getLogger().println(url.getProtocol());
+		listener.getLogger().println("Lookup time!");
 
+		List<UsernamePasswordCredentials> credentials = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getActiveInstance(),ACL.SYSTEM, new HostnamePortRequirement(url.getHost(), port));
+		if(!credentials.isEmpty()){
+		UsernamePasswordCredentials credential = credentials.get(0);
+         
 		HttpHost target = new HttpHost(url.getHost(), port, url.getProtocol());
 		org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
 		credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()),
-				new org.apache.http.auth.UsernamePasswordCredentials(c.getUsername(), c.getPassword().getPlainText()));
+				new org.apache.http.auth.UsernamePasswordCredentials(credential.getUsername(), credential.getPassword().getPlainText()));
 		
 		// Create AuthCache instance
 		AuthCache authCache = new BasicAuthCache();
@@ -164,8 +171,11 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 			//listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
 			//listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
 			EntityUtils.consume(putPageEntity);
-		} catch (Exception e) {
+		/*} catch (Exception e) {
 			listener.getLogger().print(e);
+		}*/
+		}else{
+			throw new AbortException ("Could not find credentials, confirm they exist for this domain");
 		}
 
 	}
@@ -182,19 +192,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		public DescriptorImpl() {
 			load();
 		}
-
-		/**
-		 * Performs on-the-fly validation of the form field 'name'.
-		 *
-		 * @param value
-		 *            This parameter receives the value that the user has typed.
-		 * @return Indicates the outcome of the validation. This is sent to the
-		 *         browser.
-		 *         <p>
-		 *         Note that returning {@link FormValidation#error(String)} does
-		 *         not prevent the form from being saved. It just means that a
-		 *         message will be displayed to the user.
-		 */
+		
 		public FormValidation doCheckName(@QueryParameter String value) throws IOException, ServletException {
 			if (value.length() == 0)
 				return FormValidation.error("Please set a name");
