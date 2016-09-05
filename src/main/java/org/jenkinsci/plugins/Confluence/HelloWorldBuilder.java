@@ -171,6 +171,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 			//listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
 			//listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
 			EntityUtils.consume(putPageEntity);
+			httpclient.close();
 		/*} catch (Exception e) {
 			listener.getLogger().print(e);
 		}*/
