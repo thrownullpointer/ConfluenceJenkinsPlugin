@@ -2,8 +2,7 @@ package org.jenkinsci.plugins.Confluence;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
+import java.net.URL;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -11,7 +10,6 @@ import javax.servlet.ServletException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -68,12 +66,13 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	private final String name;
 	private final String pageId;
 	private final String filePath;
-
+	private final String hostName;
 	@DataBoundConstructor
 	public HelloWorldBuilder(String name, String pageId, String filePath) {
 		this.name = name;
 		this.pageId = pageId;
 		this.filePath = filePath;
+		this.hostName = getDescriptor().getHostName();
 	}
 
 	/**
@@ -95,13 +94,19 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 	public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) {
 		List<UsernamePasswordCredentials> creds = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getInstance());
 		UsernamePasswordCredentials c = creds.get(0);
-		getDescriptor().getUseFrench();
 		
 		// SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
 		// Allow TLSv1 protocol only
 		// SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" },null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
+		try { 
+		URL url = new URL (hostName);
+		 
+		Integer port = url.getPort();
+		if (port < 0){
+			port = 80;
+		}
 
-		HttpHost target = new HttpHost("localhost", 8090, "http");
+		HttpHost target = new HttpHost(url.getHost(), port, url.getProtocol());
 		org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
 		credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()),
 				new org.apache.http.auth.UsernamePasswordCredentials(c.getUsername(), c.getPassword().getPlainText()));
@@ -124,9 +129,9 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		// Get current page version
 		String pageObj = null;
 		HttpEntity pageEntity = null;
-		try {
+		
 			String body = FileUtils.readFileToString(new File(filePath));
-			String uri = "http://localhost:8090" + "/rest/api/content/" + pageId;
+			String uri = this.hostName + "/rest/api/content/" + pageId;
 			HttpGet getPageRequest = new HttpGet(uri);
 			HttpResponse getPageResponse = httpclient.execute(target, getPageRequest, context);
 			pageEntity = getPageResponse.getEntity();
@@ -160,10 +165,6 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 	}
 
- 
-	  // Overridden for better type safety. // If your plugin doesn't really define any property on Descriptor, you don't have to do this.
-	  
-
 	@Override
 	public DescriptorImpl getDescriptor() {
 		return (DescriptorImpl) super.getDescriptor();
@@ -171,8 +172,8 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 	@Extension
 	public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
-		private boolean useFrench;
-
+		private String hostName;
+		
 		public DescriptorImpl() {
 			load();
 		}
@@ -215,26 +216,13 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
 		@Override
 		public boolean configure(StaplerRequest req, JSONObject formData) throws FormException {
-			// To persist global configuration information,
-			// set that to properties and call save().
-			useFrench = formData.getBoolean("useFrench");
-			// ^Can also use req.bindJSON(this, formData);
-			// (easier when there are many fields; need set* methods for this,
-			// like setUseFrench)
+			hostName = formData.getString("hostName");
 			save();
 			return super.configure(req, formData);
 		}
 
-		/**
-		 * This method returns true if the global configuration says we should
-		 * speak French.
-		 *
-		 * The method name is bit awkward because global.jelly calls this method
-		 * to determine the initial state of the checkbox by the naming
-		 * convention.
-		 */
-		public boolean getUseFrench() {
-			return useFrench;
+		public String getHostName() {
+			return hostName;
 		}
 
 	}
