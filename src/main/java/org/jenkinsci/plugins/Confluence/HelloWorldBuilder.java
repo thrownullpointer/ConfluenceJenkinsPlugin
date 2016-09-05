@@ -6,8 +6,6 @@ import java.net.URL;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.TrustManager;
 import javax.servlet.ServletException;
 
 import org.apache.commons.io.FileUtils;
@@ -32,7 +30,6 @@ import org.apache.http.impl.client.BasicAuthCache;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
@@ -60,21 +57,6 @@ import jenkins.model.*;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
 
-/**
- * Sample {@link Builder}.
- *
- * <p>
- * When the user configures the project and enables this builder,
- * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked and a new
- * {@link HelloWorldBuilder} is created. The created instance is persisted to
- * the project configuration XML by using XStream, so this allows you to use
- * instance fields (like {@link #name}) to remember the configuration.
- *
- * <p>
- * When a build is performed, the {@link #perform} method will be invoked.
- *
- * @author Kohsuke Kawaguchi
- */
 public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
     private final String name;
@@ -89,9 +71,6 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
         this.filePath = filePath;
     }
 
-    /**
-     * We'll use this from the <tt>config.jelly</tt>.
-     */
     public String getName() {
         return name;
     }
@@ -167,8 +146,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
                 pageObj = IOUtils.toString(pageEntity.getContent());
 
-                // listener.getLogger().println("Get Page Request returned " +
-                // getPageResponse.getStatusLine().toString());
+                // listener.getLogger().println("Get Page Request returned " + // getPageResponse.getStatusLine().toString());
                 // listener.getLogger().println(pageObj);
                 if (pageEntity != null) {
                     EntityUtils.consume(pageEntity);
@@ -186,8 +164,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
                 putPageRequest.setEntity(entity);
                 HttpResponse putPageResponse = httpclient.execute(putPageRequest);
                 putPageEntity = putPageResponse.getEntity();
-                // listener.getLogger().println("Put Page Request returned " +
-                // putPageResponse.getStatusLine().toString());
+                // listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
                 // listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
                 EntityUtils.consume(putPageEntity);
                 httpclient.close();
