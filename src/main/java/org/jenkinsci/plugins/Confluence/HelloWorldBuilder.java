@@ -98,13 +98,18 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		// SSLContext sslcontext = SSLContexts.custom().loadTrustMaterial(new File(System.getenv("javax.net.ssl.trustStore")), System.getenv("javax.net.ssl.trustStorePassword").toCharArray(), new TrustSelfSignedStrategy()).build();
 		// Allow TLSv1 protocol only
 		// SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslcontext, new String[] { "TLSv1" },null, SSLConnectionSocketFactory.getDefaultHostnameVerifier());
-		try { 
+		try {
+			listener.getLogger().println(hostName);
 		URL url = new URL (hostName);
-		 
+
 		Integer port = url.getPort();
 		if (port < 0){
 			port = 80;
 		}
+		
+		listener.getLogger().println(url.getHost());
+		listener.getLogger().println(port);
+		listener.getLogger().println(url.getProtocol());
 
 		HttpHost target = new HttpHost(url.getHost(), port, url.getProtocol());
 		org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
@@ -131,15 +136,15 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 		HttpEntity pageEntity = null;
 		
 			String body = FileUtils.readFileToString(new File(filePath));
-			String uri = this.hostName + "/rest/api/content/" + pageId;
+			String uri = this.hostName + "/rest/api/content/" + pageId + "?expand=body.storage,version,ancestors";
 			HttpGet getPageRequest = new HttpGet(uri);
 			HttpResponse getPageResponse = httpclient.execute(target, getPageRequest, context);
 			pageEntity = getPageResponse.getEntity();
 
 			pageObj = IOUtils.toString(pageEntity.getContent());
 
-			listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine().toString());
-			listener.getLogger().println(pageObj);
+			//listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine().toString());
+			//listener.getLogger().println(pageObj);
 			if (pageEntity != null) {
 				EntityUtils.consume(pageEntity);
 			}
@@ -156,8 +161,8 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 			putPageRequest.setEntity(entity);
 			HttpResponse putPageResponse = httpclient.execute(putPageRequest);
 			putPageEntity = putPageResponse.getEntity();
-			listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
-			listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
+			//listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
+			//listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
 			EntityUtils.consume(putPageEntity);
 		} catch (Exception e) {
 			listener.getLogger().print(e);
