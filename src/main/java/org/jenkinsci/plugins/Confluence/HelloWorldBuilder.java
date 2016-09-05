@@ -80,14 +80,13 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     private final String name;
     private final String pageId;
     private final String filePath;
-    private final String hostName;
+    private String hostName;
 
     @DataBoundConstructor
     public HelloWorldBuilder(String name, String pageId, String filePath) {
         this.name = name;
         this.pageId = pageId;
         this.filePath = filePath;
-        this.hostName = getDescriptor().getHostName();
     }
 
     /**
@@ -108,6 +107,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     @Override
     public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException {
         try {
+            this.hostName = getDescriptor().getHostName();
             listener.getLogger().println(hostName);
             URL url = new URL(hostName);
 
