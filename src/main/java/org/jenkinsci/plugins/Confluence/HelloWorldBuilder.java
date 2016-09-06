@@ -3,6 +3,7 @@ package org.jenkinsci.plugins.Confluence;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -33,26 +34,35 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
+import com.cloudbees.plugins.credentials.CredentialsMatcher;
+import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
+import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import com.cloudbees.plugins.credentials.domains.HostnamePortRequirement;
+import com.cloudbees.plugins.credentials.domains.SchemeRequirement;
 
 import hudson.AbortException;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.AbstractProject;
+import hudson.model.ItemGroup;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.security.ACL;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
+import hudson.util.*;
 import jenkins.model.*;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
@@ -62,13 +72,15 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     private final String name;
     private final String pageId;
     private final String filePath;
+    private final String credentialsId;
     private String hostName;
 
     @DataBoundConstructor
-    public HelloWorldBuilder(String name, String pageId, String filePath) {
+    public HelloWorldBuilder(String name, String pageId, String filePath, String credentialsId) {
         this.name = name;
         this.pageId = pageId;
         this.filePath = filePath;
+        this.credentialsId = credentialsId;
     }
 
     public String getName() {
@@ -95,85 +107,83 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
                 port = 80;
             }
 
-            listener.getLogger().println(url.getHost());
-            listener.getLogger().println(port);
-            listener.getLogger().println(url.getProtocol());
-            listener.getLogger().println("Lookup time!");
+            UsernamePasswordCredentials credential = findCredentials(this.credentialsId, url.getHost(), port);
 
-            List<UsernamePasswordCredentials> credentials = CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class,
-                    Jenkins.getActiveInstance(), ACL.SYSTEM, new HostnamePortRequirement(url.getHost(), port));
-            if (!credentials.isEmpty()) {
-                UsernamePasswordCredentials credential = credentials.get(0);
+            HttpHost target = new HttpHost(url.getHost(), port, url.getProtocol());
+            org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
+            credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()),
+                    new org.apache.http.auth.UsernamePasswordCredentials(credential.getUsername(), credential.getPassword().getPlainText()));
 
-                HttpHost target = new HttpHost(url.getHost(), port, url.getProtocol());
-                org.apache.http.client.CredentialsProvider credsProvider = new BasicCredentialsProvider();
-                credsProvider.setCredentials(new AuthScope(target.getHostName(), target.getPort()), new org.apache.http.auth.UsernamePasswordCredentials(credential.getUsername(), credential.getPassword().getPlainText()));
+            // Create AuthCache instance
+            AuthCache authCache = new BasicAuthCache();
+            BasicScheme basicAuth = new BasicScheme();
+            authCache.put(target, basicAuth);
 
-                // Create AuthCache instance
-                AuthCache authCache = new BasicAuthCache();
-                BasicScheme basicAuth = new BasicScheme();
-                authCache.put(target, basicAuth);
+            // Add AuthCache to the execution context
+            HttpClientContext context = HttpClientContext.create();
+            context.setCredentialsProvider(credsProvider);
+            context.setAuthCache(authCache);
 
-                // Add AuthCache to the execution context
-                HttpClientContext context = HttpClientContext.create();
-                context.setCredentialsProvider(credsProvider);
-                context.setAuthCache(authCache);
+            HttpClientBuilder builder = HttpClientBuilder.create();
+            RegistryBuilder<ConnectionSocketFactory> schemeRegistryBuilder = RegistryBuilder.<ConnectionSocketFactory>create();
+            schemeRegistryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
 
-                HttpClientBuilder builder = HttpClientBuilder.create();
-                RegistryBuilder<ConnectionSocketFactory> schemeRegistryBuilder = RegistryBuilder.<ConnectionSocketFactory>create();
-                schemeRegistryBuilder.register("http", PlainConnectionSocketFactory.getSocketFactory());
+            SSLContextBuilder b = new SSLContextBuilder();
+            b.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+            SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(b.build());
+            builder.setSSLSocketFactory(sslsf);
+            schemeRegistryBuilder.register("https", sslsf);
 
-                SSLContextBuilder b = new SSLContextBuilder();
-                b.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-                SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(b.build());
-                builder.setSSLSocketFactory(sslsf);
-                schemeRegistryBuilder.register("https", sslsf);
+            BasicHttpClientConnectionManager connectionManager = new BasicHttpClientConnectionManager(schemeRegistryBuilder.build());
+            builder.setConnectionManager(connectionManager);
+            builder.setDefaultCredentialsProvider(credsProvider);
+            CloseableHttpClient httpclient = builder.build();
 
-                BasicHttpClientConnectionManager connectionManager = new BasicHttpClientConnectionManager(schemeRegistryBuilder.build());
-                builder.setConnectionManager(connectionManager);
-                builder.setDefaultCredentialsProvider(credsProvider);
-                CloseableHttpClient httpclient = builder.build();
+            // Get current page version
+            String pageObj = null;
+            HttpEntity pageEntity = null;
 
-                // Get current page version
-                String pageObj = null;
-                HttpEntity pageEntity = null;
+            String body = FileUtils.readFileToString(new File(filePath));
+            String uri = this.hostName + "/rest/api/content/" + pageId + "?expand=body.storage,version,ancestors";
+            HttpGet getPageRequest = new HttpGet(uri);
+            HttpResponse getPageResponse = httpclient.execute(target, getPageRequest, context);
+            pageEntity = getPageResponse.getEntity();
 
-                String body = FileUtils.readFileToString(new File(filePath));
-                String uri = this.hostName + "/rest/api/content/" + pageId + "?expand=body.storage,version,ancestors";
-                HttpGet getPageRequest = new HttpGet(uri);
-                HttpResponse getPageResponse = httpclient.execute(target, getPageRequest, context);
-                pageEntity = getPageResponse.getEntity();
+            pageObj = IOUtils.toString(pageEntity.getContent());
 
-                pageObj = IOUtils.toString(pageEntity.getContent());
-
-                // listener.getLogger().println("Get Page Request returned " + // getPageResponse.getStatusLine().toString());
-                // listener.getLogger().println(pageObj);
-                if (pageEntity != null) {
-                    EntityUtils.consume(pageEntity);
-                }
-
-                org.json.JSONObject page = new org.json.JSONObject(pageObj);
-                page.getJSONObject("body").getJSONObject("storage").put("value", body);
-                int currentVersion = page.getJSONObject("version").getInt("number");
-                page.getJSONObject("version").put("number", currentVersion + 1);
-
-                // Send update request
-                HttpEntity putPageEntity = null;
-                HttpPut putPageRequest = new HttpPut(uri);
-                StringEntity entity = new StringEntity(page.toString(), ContentType.APPLICATION_JSON);
-                putPageRequest.setEntity(entity);
-                HttpResponse putPageResponse = httpclient.execute(putPageRequest);
-                putPageEntity = putPageResponse.getEntity();
-                // listener.getLogger().println("Put Page Request returned " + putPageResponse.getStatusLine().toString());
-                // listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
-                EntityUtils.consume(putPageEntity);
-                httpclient.close();
-            } else {
-                throw new AbortException("Could not find credentials, confirm they exist for this domain");
+            // listener.getLogger().println("Get Page Request returned " + //
+            // getPageResponse.getStatusLine().toString());
+            // listener.getLogger().println(pageObj);
+            if (pageEntity != null) {
+                EntityUtils.consume(pageEntity);
             }
+
+            org.json.JSONObject page = new org.json.JSONObject(pageObj);
+            page.getJSONObject("body").getJSONObject("storage").put("value", body);
+            int currentVersion = page.getJSONObject("version").getInt("number");
+            page.getJSONObject("version").put("number", currentVersion + 1);
+
+            // Send update request
+            HttpEntity putPageEntity = null;
+            HttpPut putPageRequest = new HttpPut(uri);
+            StringEntity entity = new StringEntity(page.toString(), ContentType.APPLICATION_JSON);
+            putPageRequest.setEntity(entity);
+            HttpResponse putPageResponse = httpclient.execute(putPageRequest);
+            putPageEntity = putPageResponse.getEntity();
+            // listener.getLogger().println("Put Page Request returned " +
+            // putPageResponse.getStatusLine().toString());
+            // listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
+            EntityUtils.consume(putPageEntity);
+            httpclient.close();
+
         } catch (Exception e) {
             listener.getLogger().println(e);
         }
+    }
+
+    public UsernamePasswordCredentials findCredentials(String credentialsId, String host, int port) {
+        return CredentialsMatchers.firstOrNull(CredentialsProvider.lookupCredentials(UsernamePasswordCredentials.class, Jenkins.getActiveInstance(), ACL.SYSTEM,
+                new HostnamePortRequirement(host, port)), CredentialsMatchers.withId(credentialsId));
     }
 
     @Override
@@ -222,6 +232,12 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
         public String getHostName() {
             return hostName;
+        }
+
+        public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context) {
+            List<StandardUsernamePasswordCredentials> credentials = CredentialsProvider.lookupCredentials(StandardUsernamePasswordCredentials.class, context,
+                    ACL.SYSTEM, Collections.<DomainRequirement>emptyList());
+            return new StandardListBoxModel().withEmptySelection().withMatching(CredentialsMatchers.always(), credentials);
         }
 
     }
