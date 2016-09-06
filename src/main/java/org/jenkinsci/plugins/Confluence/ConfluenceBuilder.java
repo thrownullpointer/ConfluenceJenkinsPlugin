@@ -63,7 +63,7 @@ import jenkins.model.*;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONObject;
 
-public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
+public class ConfluenceBuilder extends Builder implements SimpleBuildStep {
 
     private final String name;
     private final String pageId;
@@ -73,7 +73,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     private String hostName;
 
     @DataBoundConstructor
-    public HelloWorldBuilder(String name, String pageId, String filePath, String credentialsId,Boolean isRelativePath) {
+    public ConfluenceBuilder(String name, String pageId, String filePath, String credentialsId,Boolean isRelativePath) {
         this.name = name;
         this.pageId = pageId;
         this.filePath = filePath;
