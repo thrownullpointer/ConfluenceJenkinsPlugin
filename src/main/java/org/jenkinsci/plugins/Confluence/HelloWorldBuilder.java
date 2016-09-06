@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 
@@ -39,16 +38,13 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
-import com.cloudbees.plugins.credentials.CredentialsMatcher;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
-import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import com.cloudbees.plugins.credentials.domains.HostnamePortRequirement;
-import com.cloudbees.plugins.credentials.domains.SchemeRequirement;
 
 import hudson.AbortException;
 import hudson.Extension;
@@ -73,14 +69,16 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     private final String pageId;
     private final String filePath;
     private final String credentialsId;
+    private final Boolean isRelativePath;
     private String hostName;
 
     @DataBoundConstructor
-    public HelloWorldBuilder(String name, String pageId, String filePath, String credentialsId) {
+    public HelloWorldBuilder(String name, String pageId, String filePath, String credentialsId,Boolean isRelativePath) {
         this.name = name;
         this.pageId = pageId;
         this.filePath = filePath;
         this.credentialsId = credentialsId;
+        this.isRelativePath = isRelativePath;
     }
 
     public String getName() {
@@ -94,12 +92,19 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
     public String getFilePath() {
         return filePath;
     }
+    
+    public String getCredentialsId() {
+        return credentialsId;
+    }
+    
+    public Boolean getIsRelativePath() {
+        return isRelativePath;
+    }
 
     @Override
     public void perform(Run<?, ?> build, FilePath workspace, Launcher launcher, TaskListener listener) throws IOException {
         try {
             this.hostName = getDescriptor().getHostName();
-            listener.getLogger().println(hostName);
             URL url = new URL(hostName);
 
             Integer port = url.getPort();
@@ -143,7 +148,14 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
             String pageObj = null;
             HttpEntity pageEntity = null;
 
-            String body = FileUtils.readFileToString(new File(filePath));
+            String body = null;
+            if(isRelativePath){
+                String fullPath = workspace.getRemote() + File.separator +  filePath;
+                body = FileUtils.readFileToString(new File(fullPath));
+            }else{
+                body = FileUtils.readFileToString(new File(filePath));
+            }
+            
             String uri = this.hostName + "/rest/api/content/" + pageId + "?expand=body.storage,version,ancestors";
             HttpGet getPageRequest = new HttpGet(uri);
             HttpResponse getPageResponse = httpclient.execute(target, getPageRequest, context);
@@ -151,8 +163,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
 
             pageObj = IOUtils.toString(pageEntity.getContent());
 
-            // listener.getLogger().println("Get Page Request returned " + //
-            // getPageResponse.getStatusLine().toString());
+            listener.getLogger().println("Get Page Request returned " + getPageResponse.getStatusLine());
             // listener.getLogger().println(pageObj);
             if (pageEntity != null) {
                 EntityUtils.consume(pageEntity);
@@ -170,8 +181,7 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
             putPageRequest.setEntity(entity);
             HttpResponse putPageResponse = httpclient.execute(putPageRequest);
             putPageEntity = putPageResponse.getEntity();
-            // listener.getLogger().println("Put Page Request returned " +
-            // putPageResponse.getStatusLine().toString());
+            listener.getLogger().println("Put Request returned " + putPageResponse.getStatusLine());
             // listener.getLogger().println(IOUtils.toString(putPageEntity.getContent()));
             EntityUtils.consume(putPageEntity);
             httpclient.close();
@@ -199,19 +209,17 @@ public class HelloWorldBuilder extends Builder implements SimpleBuildStep {
             load();
         }
 
-        public FormValidation doCheckName(@QueryParameter String value) throws IOException, ServletException {
-            if (value.length() == 0)
-                return FormValidation.error("Please set a name");
-            if (value.length() < 4)
-                return FormValidation.warning("Isn't the name too short?");
-            return FormValidation.ok();
-        }
-
         public FormValidation doCheckPageId(@QueryParameter String value) throws IOException, ServletException {
-            if (value.length() == 0)
-                return FormValidation.error("Page id should not be left null");
-            else if (!Pattern.matches("[0-9]+", value))
-                return FormValidation.error("Page id should be a numeric value");
+            return FormValidation.validateNonNegativeInteger(value);
+        }
+        
+        public FormValidation doCheckHostName(@QueryParameter String value) throws IOException, ServletException {
+            if(value == null || value.length() < 1){
+                return FormValidation.error("Confluence plugin won't work with an empty hostname");
+            }
+            else if(!value.contains(":")){
+                return FormValidation.warning("If a port number isn't included port 80 is assumed");
+            }
             return FormValidation.ok();
         }
 
