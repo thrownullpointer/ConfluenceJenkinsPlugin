@@ -219,6 +219,8 @@ public class ConfluenceBuilder extends Builder implements SimpleBuildStep {
             }
             else if(!value.contains(":")){
                 return FormValidation.warning("If a port number isn't included port 80 is assumed");
+            } else if(value.endsWith("/")){
+                return FormValidation.warning("A trailing slash may cause issues, do not include it");
             }
             return FormValidation.ok();
         }
