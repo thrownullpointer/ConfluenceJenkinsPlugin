@@ -1,7 +1,6 @@
 <?jelly escape-by-default='true'?>
-<!--
-  This view is used to render the installed plugins page.
--->
 <div>
-  This plugin is a sample to explain how to write a Jenkins plugin.
+    This plugin from
+    <a href="https://github.com/thrownullpointer/BitbucketBuildNotifier">BitbucketBuildNotifier</a>
+    notifies bitbucket server of build status
 </div>
